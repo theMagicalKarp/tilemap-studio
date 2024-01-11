@@ -1,10 +1,6 @@
 name: CI
 
-on:
-  push:
-    branches: [ master ]
-    tags: "*"
-  pull_request:
+on: [push]
 
 jobs:
   build:
@@ -48,7 +44,7 @@ jobs:
         uses: actions/checkout@master
 
       - name: Install FLTK
-        run: |
+        run: |  
           .github/macos/build_fltk.sh
 
       - name: Build
