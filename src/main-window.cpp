@@ -253,6 +253,7 @@ Main_Window::Main_Window(int x, int y, int w, int h, const char *) : Fl_Overlay_
 	_resize_dialog = new Resize_Dialog("Resize Tilemap");
 	_shift_dialog = new Shift_Dialog("Shift Tilemap");
 	_shift_tileset_dialog = new Shift_Tileset_Dialog("Shift Tileset");
+	_shift_tile_ids_dialog = new Shift_Tileset_Dialog("Shift Tile IDs");
 	_reformat_dialog = new Reformat_Dialog("Reformat Tilemap");
 	_add_tileset_dialog = new Add_Tileset_Dialog("Add Tileset");
 	_image_to_tiles_dialog = new Image_To_Tiles_Dialog("Image to Tiles");
@@ -359,6 +360,7 @@ Main_Window::Main_Window(int x, int y, int w, int h, const char *) : Fl_Overlay_
 #endif
 		OS_MENU_ITEM("&X Flip Selection", FL_COMMAND + 'X', (Fl_Callback *)x_flip_selection_cb, this, 0),
 		OS_MENU_ITEM("&Y Flip Selection", FL_COMMAND + 'Y', (Fl_Callback *)y_flip_selection_cb, this, 0),
+		OS_MENU_ITEM("Shift Selected &IDs...", FL_COMMAND + 'J', (Fl_Callback *)shift_selected_ids_cb, this, 0),
 		OS_MENU_ITEM("&Copy Selection", FL_COMMAND + 'C', (Fl_Callback *)copy_selection_cb, this, 0),
 		OS_MENU_ITEM("&Select All", FL_COMMAND + 'a', (Fl_Callback *)select_all_cb, this, 0),
 		{},
@@ -416,6 +418,7 @@ Main_Window::Main_Window(int x, int y, int w, int h, const char *) : Fl_Overlay_
 		OS_MENU_ITEM("Re&size...", FL_COMMAND + 'e', (Fl_Callback *)resize_cb, this, 0),
 		OS_MENU_ITEM("S&hift...", FL_COMMAND + 'm', (Fl_Callback *)shift_cb, this, 0),
 		OS_MENU_ITEM("Trans&pose", FL_COMMAND + 'R', (Fl_Callback *)transpose_cb, this, 0),
+		OS_MENU_ITEM("Shift Tile I&Ds...", FL_COMMAND + 'j', (Fl_Callback *)shift_tile_ids_cb, this, 0),
 		OS_MENU_ITEM("Re&format...", FL_COMMAND + 'f', (Fl_Callback *)reformat_cb, this, FL_MENU_DIVIDER),
 		OS_MENU_ITEM("&Tileset Width...", FL_COMMAND + 'h', (Fl_Callback *)tileset_width_cb, this, 0),
 		OS_MENU_ITEM("Shift Ti&leset...", FL_COMMAND + 'k', (Fl_Callback *)shift_tileset_cb, this, FL_MENU_DIVIDER),
@@ -481,6 +484,7 @@ Main_Window::Main_Window(int x, int y, int w, int h, const char *) : Fl_Overlay_
 	_erase_selection_mi = TS_FIND_MENU_ITEM_CB(erase_selection_cb);
 	_x_flip_selection_mi = TS_FIND_MENU_ITEM_CB(x_flip_selection_cb);
 	_y_flip_selection_mi = TS_FIND_MENU_ITEM_CB(y_flip_selection_cb);
+	_shift_selected_ids_mi = TS_FIND_MENU_ITEM_CB(shift_selected_ids_cb);
 	_copy_selection_mi = TS_FIND_MENU_ITEM_CB(copy_selection_cb);
 	_select_all_mi = TS_FIND_MENU_ITEM_CB(select_all_cb);
 	_zoom_in_mi = TS_FIND_MENU_ITEM_CB(zoom_in_cb);
@@ -491,6 +495,7 @@ Main_Window::Main_Window(int x, int y, int w, int h, const char *) : Fl_Overlay_
 	_resize_mi = TS_FIND_MENU_ITEM_CB(resize_cb);
 	_shift_mi = TS_FIND_MENU_ITEM_CB(shift_cb);
 	_transpose_mi = TS_FIND_MENU_ITEM_CB(transpose_cb);
+	_shift_tile_ids_mi = TS_FIND_MENU_ITEM_CB(shift_tile_ids_cb);
 	_reformat_mi = TS_FIND_MENU_ITEM_CB(reformat_cb);
 #undef TS_FIND_MENU_ITEM_CB
 
@@ -729,6 +734,7 @@ Main_Window::~Main_Window() {
 	delete _resize_dialog;
 	delete _shift_dialog;
 	delete _shift_tileset_dialog;
+	delete _shift_tile_ids_dialog;
 	delete _reformat_dialog;
 	delete _image_to_tiles_dialog;
 	delete _help_window;
@@ -901,7 +907,9 @@ void Main_Window::update_recent_tilemaps() {
 		}
 		_recent_tilemap_mis[i]->flags &= ~FL_MENU_DIVIDER;
 	}
-	_recent_tilemap_mis[last]->flags |= FL_MENU_DIVIDER;
+	if (last > -1) {
+		_recent_tilemap_mis[last]->flags |= FL_MENU_DIVIDER;
+	}
 	_menu_bar->update();
 }
 
@@ -947,7 +955,9 @@ void Main_Window::update_recent_tilesets() {
 		}
 		_recent_tileset_mis[i]->flags &= ~FL_MENU_DIVIDER;
 	}
-	_recent_tileset_mis[last]->flags |= FL_MENU_DIVIDER;
+	if (last > -1) {
+		_recent_tileset_mis[last]->flags |= FL_MENU_DIVIDER;
+	}
 	_menu_bar->update();
 }
 
@@ -1023,6 +1033,7 @@ void Main_Window::update_selection_controls() {
 		_x_flip_selection_mi->activate();
 		_y_flip_selection_mi->activate();
 		_copy_selection_mi->activate();
+		_shift_selected_ids_mi->activate();
 		_crop_to_selection_mi->activate();
 	}
 	else {
@@ -1030,6 +1041,7 @@ void Main_Window::update_selection_controls() {
 		_x_flip_selection_mi->deactivate();
 		_y_flip_selection_mi->deactivate();
 		_copy_selection_mi->deactivate();
+		_shift_selected_ids_mi->deactivate();
 		_crop_to_selection_mi->deactivate();
 	}
 	_menu_bar->update();
@@ -1163,11 +1175,13 @@ void Main_Window::update_active_controls() {
 			_shift_mi->activate();
 			_shift_tb->activate();
 			_transpose_mi->activate();
+			_shift_tile_ids_mi->activate();
 		}
 		else {
 			_shift_mi->deactivate();
 			_shift_tb->deactivate();
 			_transpose_mi->deactivate();
+			_shift_tile_ids_mi->deactivate();
 		}
 		_reformat_mi->activate();
 		_reformat_tb->activate();
@@ -1193,6 +1207,7 @@ void Main_Window::update_active_controls() {
 		_shift_mi->deactivate();
 		_shift_tb->deactivate();
 		_transpose_mi->deactivate();
+		_shift_tile_ids_mi->deactivate();
 		_reformat_mi->deactivate();
 		_reformat_tb->deactivate();
 	}
@@ -1417,6 +1432,25 @@ void Main_Window::transpose_tilemap() {
 
 	_tilemap_width->default_value(_tilemap.width());
 	tilemap_width_tb_cb(NULL, this);
+	update_status(NULL);
+	update_active_controls();
+	redraw();
+}
+
+void Main_Window::shift_tile_ids() {
+	int d = _shift_tile_ids_dialog->shift();
+	if (d == 0) { return; }
+
+	_tilemap.remember();
+	int m = format_tileset_size(Config::format());
+	size_t n = _tilemap.size();
+	for (size_t i = 0; i < n; i++) {
+		Tile_Tessera *tt = _tilemap.tile(i);
+		tt->shift_id(d, m);
+		tt->damage(1);
+	}
+	_tilemap.modified(true);
+
 	update_status(NULL);
 	update_active_controls();
 	redraw();
@@ -1678,15 +1712,33 @@ void Main_Window::y_flip_selection() {
 	update_active_controls();
 }
 
+void Main_Window::shift_selected_ids(int d, int n) {
+	if (!_selection.selected_multiple() || _selection.from_tileset()) { return; }
+	if (d == 0) { return; }
+	_tilemap.remember();
+	size_t ox = _selection.left_col(), oy = _selection.top_row();
+	size_t mx = ox + _selection.width(), my = oy + _selection.height();
+	for (size_t y = oy; y < oy + my; y++) {
+		for (size_t x = ox; x < ox + mx; x++) {
+			Tile_Tessera *tt = _tilemap.tile(x, y);
+			if (!tt) { continue; }
+			tt->shift_id(d, n);
+			tt->damage(1);
+		}
+	}
+	_tilemap.modified(true);
+	update_active_controls();
+}
+
 void Main_Window::copy_selection() const {
 	if (!_selection.selected_multiple() || _selection.from_tileset()) { return; }
-	size_t w = _selection.width(), h = _selection.height();
+	size_t ow = _selection.width(), oh = _selection.height();
 	int z = Config::zoom();
-	Fl_Copy_Surface *surface = new Fl_Copy_Surface(w * TILE_SIZE * z, h * TILE_SIZE * z);
+	Fl_Copy_Surface *surface = new Fl_Copy_Surface(ow * TILE_SIZE * z, oh * TILE_SIZE * z);
 	surface->set_current();
 	size_t ox = _selection.left_col(), oy = _selection.top_row();
-	for (size_t dy = 0; dy < h; dy++) {
-		for (size_t dx = 0; dx < w; dx++) {
+	for (size_t dy = 0; dy < oh; dy++) {
+		for (size_t dx = 0; dx < ow; dx++) {
 			if (Tile_Tessera *tt = _tilemap.tile(ox + dx, oy + dy); tt) {
 				surface->draw(tt, dx * TILE_SIZE * z, dy * TILE_SIZE * z);
 			}
@@ -1789,7 +1841,9 @@ void Main_Window::setup_tilemap(const char *basename, int old_tileset_size, cons
 	copy_label(buffer);
 
 	load_corresponding_tileset(tileset_filename);
-	store_recent_tilemap();
+	if (!_tilemap_file.empty()) {
+		store_recent_tilemap();
+	}
 	update_tilemap_metadata();
 	update_status(NULL);
 	update_active_controls();
@@ -2540,23 +2594,32 @@ void Main_Window::redo_cb(Fl_Widget *, Main_Window *mw) {
 	mw->redraw();
 }
 
-void Main_Window::erase_selection_cb(Fl_Widget *, Main_Window *mw) {
+void Main_Window::erase_selection_cb(Fl_Menu_ *, Main_Window *mw) {
 	mw->erase_selection();
 }
 
-void Main_Window::x_flip_selection_cb(Fl_Widget *, Main_Window *mw) {
+void Main_Window::x_flip_selection_cb(Fl_Menu_ *, Main_Window *mw) {
 	mw->x_flip_selection();
 }
 
-void Main_Window::y_flip_selection_cb(Fl_Widget *, Main_Window *mw) {
+void Main_Window::y_flip_selection_cb(Fl_Menu_ *, Main_Window *mw) {
 	mw->y_flip_selection();
 }
 
-void Main_Window::copy_selection_cb(Fl_Widget *, Main_Window *mw) {
+void Main_Window::shift_selected_ids_cb(Fl_Menu_ *, Main_Window *mw) {
+	int n = format_tileset_size(Config::format());
+	mw->_shift_tile_ids_dialog->limit_shift(n);
+	mw->_shift_tile_ids_dialog->show(mw);
+	if (mw->_shift_tile_ids_dialog->canceled()) { return; }
+	int d = mw->_shift_tile_ids_dialog->shift();
+	mw->shift_selected_ids(d, n);
+}
+
+void Main_Window::copy_selection_cb(Fl_Menu_ *, Main_Window *mw) {
 	mw->copy_selection();
 }
 
-void Main_Window::select_all_cb(Fl_Widget *, Main_Window *mw) {
+void Main_Window::select_all_cb(Fl_Menu_ *, Main_Window *mw) {
 	mw->select_all();
 }
 
@@ -2751,10 +2814,10 @@ void Main_Window::crop_to_selection_cb(Fl_Menu_ *, Main_Window *mw) {
 	mw->_unsaved_dialog->show(mw);
 	if (mw->_unsaved_dialog->canceled()) { return; }
 
-	size_t rw = mw->_selection.width(), rh = mw->_selection.height();
+	size_t ow = mw->_selection.width(), oh = mw->_selection.height();
 	int px = 0 - mw->_selection.left_col(), py = 0 - mw->_selection.top_row();
 
-	mw->resize_tilemap(rw, rh, px, py);
+	mw->resize_tilemap(ow, oh, px, py);
 }
 
 void Main_Window::resize_cb(Fl_Menu_ *, Main_Window *mw) {
@@ -2807,6 +2870,14 @@ void Main_Window::transpose_cb(Fl_Menu_ *, Main_Window *mw) {
 	mw->_unsaved_dialog->show(mw);
 	if (mw->_unsaved_dialog->canceled()) { return; }
 	mw->transpose_tilemap();
+}
+
+void Main_Window::shift_tile_ids_cb(Fl_Menu_ *, Main_Window *mw) {
+	int n = format_tileset_size(Config::format());
+	mw->_shift_tile_ids_dialog->limit_shift(n);
+	mw->_shift_tile_ids_dialog->show(mw);
+	if (mw->_shift_tile_ids_dialog->canceled()) { return; }
+	mw->shift_tile_ids();
 }
 
 void Main_Window::reformat_cb(Fl_Menu_ *, Main_Window *mw) {
